@@ -1,0 +1,10 @@
+# Need to set these env vars if want to import some faiss prebuild with mkl (inserting the correct paths) (can set in cloud func editor)
+# export LD_LIBRARY_PATH=/env/lib:${LD_LIBRARY_PATH}
+# pip install mkl installs mkl binaries in /env/lib on google cloud functions
+# export LD_PRELOAD=/env/lib/libmkl_core.so:/env/lib/libmkl_sequential.so
+
+https://download.pytorch.org/whl/cpu/torch-1.0.0-cp37-cp37m-linux_x86_64.whl
+pytorch-pretrained-bert
+mkl
+google-cloud-datastore
+google-cloud-storage
