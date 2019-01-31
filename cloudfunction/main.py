@@ -82,10 +82,6 @@ def sentenceVector(sentence):
 testSentence = "I'm a hungry HUNGRY hippOO"
 print("Testing BERT: Sentence vector sum for \"{}\" : {}".format(testSentence, torch.sum(sentenceVector(testSentence))))
 
-def f(x):
-    if x>10:
-        return x*x
-
 def getTextUnit(vectorIndex):
     query = datastoreClient.query(kind="BookTextUnit")
     query.add_filter("vectorNum", "=", vectorIndex)
@@ -107,7 +103,7 @@ def hello_world(request):
     """
     if request.method == "OPTIONS":
         withCORS(request)
-    else if request.method == "POST"
+    elif request.method == "POST":
         request_json = request.get_json()
         if request_json and "sentence" in request_json:
             sentence =  request_json["sentence"]
