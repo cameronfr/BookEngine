@@ -22,7 +22,7 @@ bucket = storageClient.get_bucket("mlstorage-cloud")
 
 # Might want to switch to using google cloud storage python library, so can make these files in bucket private.
 INDEX_URL = "https://storage.googleapis.com/mlstorage-cloud/GutenBert/faissIndexFirst2000IMI16byte64subv"
-INDEX_BLOB = "GutenBert/faissIndexFirst500BooksIMI16byte64subv"
+INDEX_BLOB = "GutenBert/faissIndexFirst13000BooksIMI16byte64subv"
 INDEX_PATH = "/tmp/faissIndex"
 MODEL_URL = "https://storage.googleapis.com/mlstorage-cloud/Data/bert-base-uncased.tar.gz"
 MODEL_BLOB = "Data/bert-base-uncased.tar.gz"
@@ -30,7 +30,6 @@ MODEL_PATH = "/tmp/model.tar.gz"
 
 print("Downloading model")
 # print(urlretrieve(MODEL_URL, MODEL_PATH))
-list(bucket.list_blobs(prefix="Data/bert"))
 print(bucket.blob(MODEL_BLOB).download_to_filename(MODEL_PATH))
 
 print("Loading model")
