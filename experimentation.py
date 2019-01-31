@@ -87,75 +87,95 @@ def put_multi(dbObjects):
             client.put_multi(entities)
     client = datastore.Client("traininggpu")
     entities = []
+    failCount = 0
     for obj in dbObjects:
-        entity = datastore.Entity(key=client.key("BookTextUnit"), exclude_from_indexes=['textUnit'])
+        key = client.key("BookTextUnit", obj["key"])
+        del obj["key"]
+        entity = datastore.Entity(key=key, exclude_from_indexes=['textUnit']) #next time, should make own id from bookNum+bookPos. So will avoid duplicates.
         entity.update(obj)
         entities.append(entity)
     try:
         upload(entities)
     except Exception as e:
         print("Transaction failed, {}, retrying...".format(str(e)))
-        time.sleep(np.random.randint(1, 7))
-        upload(entities)
+        failCount += 1
+        time.sleep(np.random.randint(3, 12))
+        if failCount < 30:
+            upload(entities)
+        else:
+            print("Transaction failed, {}, not retrying, {}".format(str(e), str(dbObjects)))
+            raise e
 
 def uploadDBObjects(dbObjects):
     UPLOAD_LIMIT = 500
     numDivisions = math.ceil(len(dbObjects)/UPLOAD_LIMIT)
     dataList = [dbObjects[i*UPLOAD_LIMIT:(i+1)*UPLOAD_LIMIT] for i in range(numDivisions)]
     numThreads = min(100, numDivisions) # limit threads. I think datastore might create one FD per obj, so set ulimit -n more than 500*100 = 50000
-    with ThreadPoolExecutor(max_workers=numThreads) as executor: # I think this context manager prevents async -- it waits until everything is done
-        futures = [executor.submit(put_multi, data) for data in dataList]
-        # res = [future.result() for future in futures] #make sure errors are thrown
+    executor = ThreadPoolExecutor(max_workers=numThreads)
+    futures = [executor.submit(put_multi, data) for data in dataList]
+    return (executor, futures)
 
 ((11507*5000)/100000)*0.18 #cost to put all book paragraphs in DB
-bookDicts = loadAllBooks("")
 
+bookDicts = loadAllBooks("")
 # Convert book to corresponding vectors and database objects, update database every 500 books
 # State of this loading: vectorLists, globalVectorNum, bookNumber/batch
-vectorLists = []
-vectorLists = pickle.load(open("vectorLists", "rb"))
+# vectorLists = []
+# vectorLists = pickle.load(open("vectorLists", "rb"))
+(startBook, globalVectorNum) = pickle.load(open("progressState", "rb"))
+print("Starting at book {} and vector num {}".format(startBook, globalVectorNum))
 dbObjectsBuffer = []
-globalVectorNum = 0
 vectorBuffer = []
-startBook = 500
-for idx, bookDict in tqdm.tqdm(enumerate(bookDicts[startBook:])):
+for idx, bookDict in enumerate(bookDicts[startBook:]):
+    currentBookIdx = startBook + idx
     textUnits = bookDict["textUnits"]
     shouldBeVectored = lambda u: (u != "") and (len(u.split()) > 50)
     vectoredTextUnitsMap = list(map(shouldBeVectored, textUnits))
     vectors = list(filter(shouldBeVectored, textUnits))
-    if not vectors:
-        continue
-    vectorBuffer += vectors
+    if vectors:
+        vectorBuffer += vectors
 
-    for jdx, textUnit in enumerate(textUnits):
-        dbObj = {"bookNum": bookDict["bookNum"], "textUnit": textUnit, "inBookLocation": jdx}
-        if vectoredTextUnitsMap[jdx]:
-            dbObj["vectorNum"] = globalVectorNum
-            globalVectorNum += 1
-        dbObjectsBuffer.append(dbObj)
-    if (idx + 1) % 500 == 0:
-        currentBookIdx = startBook + idx
+        for jdx, textUnit in enumerate(textUnits):
+            key = "bookNo" + str(bookDict["bookNum"]) + "pos" + str(jdx)
+            dbObj = {"key": key, "bookNum": bookDict["bookNum"], "textUnit": textUnit, "inBookLocation": jdx}
+            if vectoredTextUnitsMap[jdx]:
+                dbObj["vectorNum"] = globalVectorNum
+                globalVectorNum += 1
+            dbObjectsBuffer.append(dbObj)
+    if ((idx+1) % 500 == 0) or ((currentBookIdx+1) == len(bookDicts)):
         def logMsg(x):
             logger.log_text(x)
             print(x)
-        logMsg("Converting textUnits to vectors({} of them), up to book {}, globalVecNum {}".format(len(vectorBuffer), currentBookIdx+1, globalVectorNum))
-        vectorBuffer = bertClient.encode(vectorBuffer)
-        vectorLists.append(vectorBuffer)
-        vectorBuffer = []
-        logMsg("Uploading latest book textUnits ({} of them) to database, up to book {}, globalVecNum {}".format(len(dbObjectsBuffer), currentBookIdx+1, globalVectorNum))
-        uploadDBObjects(dbObjectsBuffer) #can make this async without issue, I think.
+
+        logMsg("Starting upload of latest book textUnits ({} of them) to database, up to book {}, globalVecNum {}".format(len(dbObjectsBuffer), currentBookIdx+1, globalVectorNum))
+        uploadManager = uploadDBObjects(dbObjectsBuffer) #can make this async without issue, I think.
         dbObjectsBuffer = []
+
+        logMsg("Converting textUnits to vectors({} of them), up to book {}, globalVecNum {}".format(len(vectorBuffer), currentBookIdx+1, globalVectorNum))
+        encodedVectors= bertClient.encode(vectorBuffer)
+        vectorBuffer = []
+
+        logMsg("Saving vector buffer to disk")
+        fileObject = open("vectorListPt{}".format(currentBookIdx+1), 'wb')
+        pickle.dump(encodedVectors, fileObject)
+        fileObject.close()
+
+        logMsg("Waiting for upload to finish")
+        [f.result() for f in uploadManager[1]] # make sure any errors are thrown in main thread
+        uploadManager[0].shutdown(wait=True)
+
         # print("Updating latest book vectors to index, up to book ", idx)
         # index.add(list(chain(*bookVectorLists)))
         # bookVectorLists = []
-        logMsg("Saving vectors to disk")
-        fileObject = open("vectorLists", 'wb')
-        pickle.dump(vectorLists, fileObject)
+        logMsg("Saving progress state to file")
+        fileObject = open("progressState", 'wb')
+        pickle.dump((currentBookIdx+1, globalVectorNum), fileObject)
         fileObject.close()
+
         logMsg("Finished updating database and index, up to book {}, globalVecNum {}".format(currentBookIdx+1, globalVectorNum))
 
 #------------------------------ VERIFYING AND STUFF ------------------------------#
-
+print("test")
 bookVectorLists = vectorLists
 len(vectorBuffer)
 len(bookVectorLists)
@@ -172,17 +192,28 @@ dbObjects[10]["vectorNum"]
 
 globalVectorNum
 query = datastoreClient.query(kind="BookTextUnit")
+query.add_filter("vectorNum", ">", 5772007)
+query.add_filter("vectorNum", ">", 5702007)
+query.add_filter("vectorNum", "=", 4953237)
+bookDicts[25000]["bookNum"]
+bookDicts[25500]["bookNum"]
+query.add_filter("bookNum", ">", 26194 - 1)
+query.add_filter("bookNum", "<", 26790)
 query.keys_only()
 allEntities = query.fetch()
+list(allEntities)[0]["bookNum"]
 len(list(allEntities))
 num = 0
 executor = ThreadPoolExecutor(100)
+futures = []
 for i in tqdm.tqdm(allEntities):
-    # x = executor.submit(lambda key=i.key: datastoreClient.delete(key))
+    x = executor.submit(lambda key=i.key: datastoreClient.delete(key))
+    futures.append(x)
     num += 1
 len(dbObjectsBuffer)
+[f for f in futures[380000:]]
 len(dbObjectsBuffer) - num
-executor.shutdown()
+executor.shutdown(wait=True)
 len(dbObjectsBuffer) + len(dbObjectsBuffer) - 24932
 for i in range(1000): # stress test # of file descriptions
     f = open("test" +str(i), "wb")
@@ -256,7 +287,11 @@ index.add(allVecs)
 allVecs.shape
 index.is_trained
 index.search(allVecs[:10], 1)[1]
-faiss.write_index(index, "faissIndexFirst500BooksIMI16byte64subv")
+faiss.write_index(index, "faissIndexFirst13000BooksIMI16byte64subv")
+storageClient = storage.Client()
+bucket = storageClient.get_bucket("mlstorage-cloud")
+bucket.blob("GutenBert/faissIndexFirst13000BooksIMI16byte64subv").upload_from_filename("faissIndexFirst13000BooksIMI16byte64subv")
+
 index = faiss.read_index("faissIndex") #not sure how much memory faiss.IO_FLAG_READ_ONLY uses w.r.t actual size
 
 queries = allVecs[0:10000]
