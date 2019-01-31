@@ -11,11 +11,11 @@ from flask import jsonify
 from concurrent.futures import ThreadPoolExecutor
 print("Finished importing")
 
-print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).astype('float32')))
+print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).astype("float32")))
 # print("All directories and files:")
 # for dirpath, dirnames, filenames in os.walk("/"):
 #     print(dirpath, dirnames, filenames)
-# os.environ['GOOGLE_APPLICATION_CREDENTIALS']="/home/cameronfranz/storage.json"
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/cameronfranz/storage.json"
 datastoreClient = datastore.Client("traininggpu")
 storageClient = storage.Client()
 bucket = storageClient.get_bucket("mlstorage-cloud")
@@ -47,6 +47,19 @@ index = faiss.read_index(INDEX_PATH)
 # index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 # delete downloaded index. unless MMAP (memory map) setting is faster.
 
+def withCORS(request, content=""):
+    if request.method == "OPTIONS":
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Max-Age": "3600"
+        }
+        return (content, 204, headers)
+    headers = {
+        "Access-Control-Allow-Origin": "*"
+    }
+    return (content, 200, headers)
 
 def sentenceVector(sentence):
     seqLength = 20
@@ -83,7 +96,6 @@ def getTextUnit(vectorIndex):
         print("Could not find vector key in database: {}".format(vectorIndex))
         return None
 
-
 def hello_world(request):
     """Responds to any HTTP request.
     Args:
@@ -93,18 +105,25 @@ def hello_world(request):
         Response object using
         `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
     """
-    request_json = request.get_json()
-    if request_json and "sentence" in request_json:
-        sentence =  request_json["sentence"]
-        print("Processing sentence: ", sentence)
-        if not sentence:
-            flask.abort(400, {"msg": "Empty sentence"})
-        vector = sentenceVector(sentence)
-        textUnitIndices = index.search(vector.detach().numpy(), 15)[1][0].tolist()
-        executor = ThreadPoolExecutor(len(textUnitIndices))
-        textUnits = list(executor.map(getTextUnit, textUnitIndices))
-        executor.shutdown()
-        textUnits = list(filter(lambda x: x, textUnits))
-        textUnits = list(map(lambda x: x["textUnit"], textUnits))
-        return jsonify({"textUnits": textUnits})
-    flask.abort(400, {"msg": "Request JSON missing"})
+    if request.method == "OPTIONS":
+        withCORS(request)
+    else if request.method == "POST"
+        request_json = request.get_json()
+        if request_json and "sentence" in request_json:
+            sentence =  request_json["sentence"]
+            print("Processing sentence: ", sentence)
+            if not sentence:
+                flask.abort(400, {"msg": "Empty sentence"})
+            vector = sentenceVector(sentence)
+            textUnitIndices = index.search(vector.detach().numpy(), 15)[1][0].tolist()
+            executor = ThreadPoolExecutor(len(textUnitIndices))
+            textUnits = list(executor.map(getTextUnit, textUnitIndices))
+            executor.shutdown()
+            textUnits = list(filter(lambda x: x, textUnits))
+            textUnits = list(map(lambda x: x["textUnit"], textUnits))
+            content = jsonify({"textUnits": textUnits})
+            withCORS(request, content)
+        else:
+            flask.abort(400, {"msg": "Request JSON missing"})
+    else:
+        flask.abort(400, {"msg": "Invalid request method"})
