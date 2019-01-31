@@ -47,19 +47,19 @@ index = faiss.read_index(INDEX_PATH)
 # index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 # delete downloaded index. unless MMAP (memory map) setting is faster.
 
-def withCORS(request, content=""):
+def withCORS(request, content="", status=200):
     if request.method == "OPTIONS":
         headers = {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST",
             "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Max-Age": "3600"
+            "Access-Control-Max-Age": "86400"
         }
         return (content, 204, headers)
     headers = {
         "Access-Control-Allow-Origin": "*"
     }
-    return (content, 200, headers)
+    return (content, status, headers)
 
 def sentenceVector(sentence):
     seqLength = 20
@@ -102,7 +102,7 @@ def hello_world(request):
         `make_response <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>`.
     """
     if request.method == "OPTIONS":
-        withCORS(request)
+        return withCORS(request)
     elif request.method == "POST":
         request_json = request.get_json()
         if request_json and "sentence" in request_json:
@@ -118,8 +118,10 @@ def hello_world(request):
             textUnits = list(filter(lambda x: x, textUnits))
             textUnits = list(map(lambda x: x["textUnit"], textUnits))
             content = jsonify({"textUnits": textUnits})
-            withCORS(request, content)
+            return withCORS(request, content, 200)
         else:
-            flask.abort(400, {"msg": "Request JSON missing"})
+            content = jsonify({"msg": "Request JSON missing"})
+            return withCORS(request, content, 400)
     else:
-        flask.abort(400, {"msg": "Invalid request method"})
+        content = jsonify({"msg": "Invalid request method"})
+        return withCORS(request, content, 400)
