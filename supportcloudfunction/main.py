@@ -6,8 +6,8 @@ import os
 print("Finished importing")
 
 datastoreClient = datastore.Client("traininggpu")
-storageClient = storage.Client()
-bucket = storageClient.get_bucket("mlstorage-cloud")
+# storageClient = storage.Client()
+# bucket = storageClient.get_bucket("mlstorage-cloud")
 # os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/cameronfranz/storage.json"
 
 def withCORS(request, content="", status=200):
@@ -51,8 +51,8 @@ def hello_world(request):
             numUnitsRequested = len(inBookLocations)
             if numUnitsRequested > 25:
                 raise Exception("Requested range too large")
-            executor = ThreadPoolExecutor(25)
-            textUnits = executor.map(getTextUnit, [bookNum]*numUnitsRequested, inBookLocations)
+            executor = ThreadPoolExecutor(numUnitsRequested)
+            textUnits = list(executor.map(getTextUnit, [bookNum]*numUnitsRequested, inBookLocations))
             textUnits = list(filter(lambda x: x, textUnits))
             executor.shutdown()
             content = jsonify({"textUnits": textUnits})
