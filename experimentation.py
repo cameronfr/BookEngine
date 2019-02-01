@@ -9,6 +9,7 @@
 #As long as max_seq_len captures whole of text, the vectors will be the same, even if max_seq_len differs.
 #Is Bert applied to a paragraph different from the average of bert applied to each sentence in the paragraph?
 import torch
+import faiss
 import time
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
@@ -121,7 +122,6 @@ bookDicts = loadAllBooks("")
 # Convert book to corresponding vectors and database objects, update database every 500 books
 # State of this loading: vectorLists, globalVectorNum, bookNumber/batch
 # vectorLists = []
-# vectorLists = pickle.load(open("vectorLists", "rb"))
 (startBook, globalVectorNum) = pickle.load(open("progressState", "rb"))
 print("Starting at book {} and vector num {}".format(startBook, globalVectorNum))
 dbObjectsBuffer = []
@@ -174,6 +174,34 @@ for idx, bookDict in enumerate(bookDicts[startBook:]):
 
         logMsg("Finished updating database and index, up to book {}, globalVecNum {}".format(currentBookIdx+1, globalVectorNum))
 
+# Loading all vector files in memory
+# vectorListPt17001 is filled with vectors of -10, because accidentally duplicated 165000-17000 in DB
+# vectorListPt17001 is removed from index by calling index.remove_ids(np.arange(5947759, 6123511)). This does not cause IDs to change
+# Currently getting around 0.2 top-1 accuracy over all 17mil vectors with OPQ16_64, IMI2x11, PQ16. Maybe need to train on more vecs?
+
+vectorLists = []
+vectorDir = "vectorListsParts/"
+filenames = os.listdir(vectorDir)
+filenames = list(filter(lambda x: "vectorListPt" in x, filenames))
+filenames = sorted(filenames, key=lambda x: int(x.split("vectorListPt")[1]))
+# Load random 10% subset
+indexes = np.random.choice(list(range(len(filenames))), 15)
+for filename in [filenames[i] for i in indexes]:
+    vectorLists.append(pickle.load(open(os.path.join(vectorDir, filename), "rb")))
+# Load all
+executor = ThreadPoolExecutor(102)
+loadFile = lambda filename: pickle.load(open(os.path.join(vectorDir, filename), "rb"))
+vectorLists = executor.map(loadFile, filenames)
+executor.shutdown(wait=True)
+normalize = lambda vectors: vectors / np.sqrt(np.sum(vectors * vectors, axis=1)).reshape(-1, 1)
+[index.add(normalize(vectors)) for vectors in vectorLists]
+index.remove_ids(np.arange(5947759, 6123511))
+len(list(chain(*vectorLists)))
+[indexSlow.add(normalize(vectors)) for vectors in vectorLists]
+allVecs = normalize(np.array(loadFile(filenames[-1])))
+len(allVecs)
+# index.ntotal
+# allVecs = np.array(list(chain(*vectorLists)))
 #------------------------------ VERIFYING AND STUFF ------------------------------#
 print("test")
 bookVectorLists = vectorLists
@@ -259,12 +287,11 @@ for o in obj:
         print(o)
 
 # Create and save FAISS index
-import faiss
 
 os.chdir("/home/cameronfranz/")
 bookVectorLists = pickle.load(open("bookVectorListsFirst2000", "rb"))
 globalVectorNum
-allVecs = np.array(list(chain(*bookVectorLists)))
+allVecs = np.array(list(chain(*vectorLists)))
 indexSlow = faiss.IndexFlatIP(768)
 allVecs = allVecs / np.sqrt(np.sum(allVecs * allVecs, axis=1)).reshape(-1, 1)
 indexSlow.reset()
@@ -279,6 +306,7 @@ test11 = faiss.read_index("faissIndexSlow", faiss.IO_FLAG_MMAP) #not sure how mu
 # Think will use 16-byte codes because memory seems to be double the expected (expect ~25 mb, got ~50mb). Training and adding way slower for OP16 for some reason. Don't think 32byte was training correctly.
 # Might just be because use not using enough vectors -- IMI with 2x13 on 10M vecs takes +80%, while 2x10 on 10M vecs takes +10%.
 # index = faiss.index_factory(768, "OPQ32_128, IVF16384_HNSW32, PQ32") #need 30 to 256 times 16384 training vecs, 1M would be ~60x 16384. Takes 6min on 700k vecs, so fast.
+index = faiss.index_factory(768, "OPQ16_64, IMI2x11, PQ16") #IVF above has like +112% overhead (so *2.12), this has 10% overhead
 index = faiss.index_factory(768, "OPQ16_64, IMI2x10, PQ16") #IVF above has like +112% overhead (so *2.12), this has 10% overhead
 index.train(allVecs)
 index.reset()
@@ -287,15 +315,16 @@ index.add(allVecs)
 allVecs.shape
 index.is_trained
 index.search(allVecs[:10], 1)[1]
-faiss.write_index(index, "faissIndexFirst13000BooksIMI16byte64subv")
+filename = "faissIndexALLBooksIMI16byte64subv"
+faiss.write_index(index, filename)
 storageClient = storage.Client()
 bucket = storageClient.get_bucket("mlstorage-cloud")
-bucket.blob("GutenBert/faissIndexFirst13000BooksIMI16byte64subv").upload_from_filename("faissIndexFirst13000BooksIMI16byte64subv")
+bucket.blob("GutenBert/" + filename).upload_from_filename(filename)
+#630 mb ish for std loading
+index5 = faiss.read_index(filename, faiss.IO_FLAG_READ_ONLY) #not sure how much memory faiss.IO_FLAG_READ_ONLY uses w.r.t actual size
 
-index = faiss.read_index("faissIndex") #not sure how much memory faiss.IO_FLAG_READ_ONLY uses w.r.t actual size
-
-queries = allVecs[0:10000]
-base = allVecs[10000:20000]
+queries = allVecs[0:500]
+base = allVecs[50000:100000]
 index.reset()
 index.add(base)
 indexSlow.reset()
@@ -303,15 +332,16 @@ indexSlow.add(base)
 index.ntotal
 indexSlow.ntotal
 inTopKAccuracy = lambda k: np.sum([res[0] in res[1:6] for res in np.concatenate((indexSlow.search(queries, 1)[1], index.search(queries, k)[1]), axis=1)])/queries.shape[0]
-inTopKAccuracy(1)
+inTopKAccuracy(5)
 
+groundTruth = indexSlow.search(queries, 1)[1]
 groundTruth = np.array([np.argmax(np.matmul(base, x), axis=0) for x in queries]).reshape((-1, 1))
 crit = faiss.OneRecallAtRCriterion(queries.shape[0], 1)
 crit.set_groundtruth(None, groundTruth.astype("int64"))
-crit.nnn = groundTruth.shape[1] #number of nearest neighbors that crit requests.
+crit.nnn = 5#groundTruth.shape[1] #number of nearest neighbors that crit requests.
 params = faiss.ParameterSpace()
 params.initialize(index)
-params.n_experiments = 500 #crucial, .explore(...) won't return any operating points without this.
+params.n_experiments = 200 #crucial, .explore(...) won't return any operating points without this.
 opi = params.explore(index, queries, crit)
 opi.optimal_pts.size()
 #

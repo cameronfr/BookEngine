@@ -22,7 +22,7 @@ bucket = storageClient.get_bucket("mlstorage-cloud")
 
 # Might want to switch to using google cloud storage python library, so can make these files in bucket private.
 INDEX_URL = "https://storage.googleapis.com/mlstorage-cloud/GutenBert/faissIndexFirst2000IMI16byte64subv"
-INDEX_BLOB = "GutenBert/faissIndexFirst13000BooksIMI16byte64subv"
+INDEX_BLOB = "GutenBert/faissIndexALLBooksIMI16byte64subv"
 INDEX_PATH = "/tmp/faissIndex"
 MODEL_URL = "https://storage.googleapis.com/mlstorage-cloud/Data/bert-base-uncased.tar.gz"
 MODEL_BLOB = "Data/bert-base-uncased.tar.gz"
@@ -42,9 +42,10 @@ print("Downloading index")
 print(bucket.blob(INDEX_BLOB).download_to_filename(INDEX_PATH))
 
 print("Loading index")
-index = faiss.read_index(INDEX_PATH)
+index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_READ_ONLY)
 # index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 # delete downloaded index. unless MMAP (memory map) setting is faster.
+os.remove(INDEX_PATH)
 
 def withCORS(request, content="", status=200):
     if request.method == "OPTIONS":
