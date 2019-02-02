@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor
 process = psutil.Process(os.getpid())
 print("Finished importing")
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).astype("float32")))
 # print("All directories and files:")
@@ -23,7 +22,6 @@ datastoreClient = datastore.Client("traininggpu")
 storageClient = storage.Client()
 bucket = storageClient.get_bucket("mlstorage-cloud")
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 INDEX_BLOB = "GutenBert/faissIndexALLBooksIMI16byte64subv"
 INDEX_PATH = "/tmp/faissIndex"
@@ -33,27 +31,26 @@ MODEL_PATH = "/tmp/model.tar.gz"
 print("Downloading model")
 print(bucket.blob(MODEL_BLOB).download_to_filename(MODEL_PATH))
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 print("Loading model")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", cache_dir="/tmp", do_lower_case=True)
 model = BertModel.from_pretrained(MODEL_PATH)
+print("Removing model file")
 os.remove(MODEL_PATH)
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 print("Downloading index")
 print(bucket.blob(INDEX_BLOB).download_to_filename(INDEX_PATH))
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 print("Loading index")
-index = faiss.read_index(INDEX_PATH)
+# index = faiss.read_index(INDEX_PATH)
+index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_READ_ONLY | faiss.IO_FLAG_MMAP)
 # index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
 # delete downloaded index. unless MMAP (memory map) setting is faster.
-os.remove(INDEX_PATH)
+# print("Removing index file")
+# os.remove(INDEX_PATH)
 print("mem", process.memory_info().rss)
-print(os.listdir("/tmp"))
 
 def withCORS(request, content="", status=200):
     if request.method == "OPTIONS":
