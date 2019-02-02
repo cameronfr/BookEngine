@@ -115,7 +115,12 @@ def hello_world(request):
             if not sentence:
                 flask.abort(400, {"msg": "Empty sentence"})
             vector = sentenceVector(sentence)
-            textUnitIndices = index.search(vector.detach().numpy(), 18)[1][0].tolist()
+            rawTextUnitIndices = index.search(vector.detach().numpy(), 20)[1][0].tolist()
+            textUnitIndices = [] #have to remove duplicates, not sure why there are duplicatesself.
+            # faiss says the distances between two duplicate indexes' vectors are diff by ~0.000008 .
+            for i in rawTextUnitIndices:
+                if i not in textUnitIndices:
+                    textUnitIndices.append(i)
             executor = ThreadPoolExecutor(len(textUnitIndices))
             textUnits = list(executor.map(getTextUnit, textUnitIndices))
             executor.shutdown()
