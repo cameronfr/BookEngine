@@ -1,11 +1,9 @@
 import torch
 import flask
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
-from urllib.request import urlretrieve
 import os
 import psutil
 from google.cloud import datastore
-from google.cloud import storage
 import numpy
 import faiss
 from flask import jsonify
@@ -13,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 process = psutil.Process(os.getpid())
 print("Finished importing")
 print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
 
 print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).astype("float32")))
 # print("All directories and files:")
@@ -20,41 +19,40 @@ print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).as
 #     print(dirpath, dirnames, filenames)
 # os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/cameronfranz/storage.json"
 datastoreClient = datastore.Client("traininggpu")
-storageClient = storage.Client()
-bucket = storageClient.get_bucket("mlstorage-cloud")
 print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
 
-# Might want to switch to using google cloud storage python library, so can make these files in bucket private.
-INDEX_URL = "https://storage.googleapis.com/mlstorage-cloud/GutenBert/faissIndexFirst2000IMI16byte64subv"
 INDEX_BLOB = "GutenBert/faissIndexALLBooksIMI16byte64subv"
 INDEX_PATH = "/tmp/faissIndex"
-MODEL_URL = "https://storage.googleapis.com/mlstorage-cloud/Data/bert-base-uncased.tar.gz"
 MODEL_BLOB = "Data/bert-base-uncased.tar.gz"
 MODEL_PATH = "/tmp/model.tar.gz"
-
-print("Downloading index")
-# print(urlretrieve(INDEX_URL, INDEX_PATH))
-print(bucket.blob(INDEX_BLOB).download_to_filename(INDEX_PATH))
-print("mem", process.memory_info().rss)
-
-print("Loading index")
-index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_READ_ONLY)
-# index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
-# delete downloaded index. unless MMAP (memory map) setting is faster.
-os.remove(INDEX_PATH)
-print("mem", process.memory_info().rss)
 
 print("Downloading model")
 # print(urlretrieve(MODEL_URL, MODEL_PATH))
 print(bucket.blob(MODEL_BLOB).download_to_filename(MODEL_PATH))
 print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
 
 print("Loading model")
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", cache_dir="/tmp", do_lower_case=True)
 model = BertModel.from_pretrained(MODEL_PATH)
 os.remove(MODEL_PATH)
 print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
 
+print("Downloading index")
+# print(urlretrieve(INDEX_URL, INDEX_PATH))
+print(bucket.blob(INDEX_BLOB).download_to_filename(INDEX_PATH))
+print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
+
+print("Loading index")
+index = faiss.read_index(INDEX_PATH)
+# index = faiss.read_index(INDEX_PATH, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)
+# delete downloaded index. unless MMAP (memory map) setting is faster.
+os.remove(INDEX_PATH)
+print("mem", process.memory_info().rss)
+print(os.listdir("/tmp"))
 
 def withCORS(request, content="", status=200):
     if request.method == "OPTIONS":
