@@ -12,7 +12,7 @@ from flask import jsonify
 from concurrent.futures import ThreadPoolExecutor
 process = psutil.Process(os.getpid())
 print("Finished importing")
-print("mem" process.memory_info().rss)
+print("mem", process.memory_info().rss)
 
 print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).astype("float32")))
 # print("All directories and files:")
