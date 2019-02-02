@@ -4,6 +4,7 @@ from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 import os
 import psutil
 from google.cloud import datastore
+from google.cloud import storage
 import numpy
 import faiss
 from flask import jsonify
@@ -19,6 +20,8 @@ print("Testing Faiss", faiss.Kmeans(10, 20).train(numpy.random.rand(1000, 10).as
 #     print(dirpath, dirnames, filenames)
 # os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/home/cameronfranz/storage.json"
 datastoreClient = datastore.Client("traininggpu")
+storageClient = storage.Client()
+bucket = storageClient.get_bucket("mlstorage-cloud")
 print("mem", process.memory_info().rss)
 print(os.listdir("/tmp"))
 
@@ -28,7 +31,6 @@ MODEL_BLOB = "Data/bert-base-uncased.tar.gz"
 MODEL_PATH = "/tmp/model.tar.gz"
 
 print("Downloading model")
-# print(urlretrieve(MODEL_URL, MODEL_PATH))
 print(bucket.blob(MODEL_BLOB).download_to_filename(MODEL_PATH))
 print("mem", process.memory_info().rss)
 print(os.listdir("/tmp"))
@@ -41,7 +43,6 @@ print("mem", process.memory_info().rss)
 print(os.listdir("/tmp"))
 
 print("Downloading index")
-# print(urlretrieve(INDEX_URL, INDEX_PATH))
 print(bucket.blob(INDEX_BLOB).download_to_filename(INDEX_PATH))
 print("mem", process.memory_info().rss)
 print(os.listdir("/tmp"))
