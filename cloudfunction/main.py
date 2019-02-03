@@ -37,7 +37,7 @@ os.remove(METADATA_PATH)
 metadata = {}
 requiredFields = ["Author", "Title", "Author Birth", "Author Death"]
 for data in rawMetadata:
-    missingFields = filter(lambda x: requiredField not in data, requiredFields)
+    missingFields = filter(lambda x: x not in data, requiredFields)
     [data.update({missingField: "?"}) for missingField in missingFields]
     metadata.update({int(data["Num"]): data})
 
