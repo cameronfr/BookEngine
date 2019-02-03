@@ -35,7 +35,11 @@ bucket.blob(METADATA_BLOB).download_to_filename(METADATA_PATH)
 rawMetadata = json.loads(open(METADATA_PATH).read())
 os.remove(METADATA_PATH)
 metadata = {}
-[metadata.update({int(item["Num"]): item}) for item in rawMetadata] #create dict keyed by book nnum
+requiredFields = ["Author", "Title", "Author Birth", "Author Death"]
+for data in rawMetadata:
+    missingFields = filter(lambda x: requiredField not in data, requiredFields)
+    [data.update({missingField: "?"}) for missingField in missingFields]
+    metadata.update({int(data["Num"]): data})
 
 print("Downloading model")
 bucket.blob(MODEL_BLOB).download_to_filename(MODEL_PATH)
