@@ -29,7 +29,7 @@ def getTextUnit(bookNum, inBookLocation):
     query.add_filter("inBookLocation", "=", inBookLocation)
     query.add_filter("bookNum", "=", bookNum)
     res = list(query.fetch())
-    res = res[0]["textUnit"] if res else None
+    res = res[0] if res else None
     return res
 
 def hello_world(request):
