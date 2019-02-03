@@ -20,6 +20,12 @@ class App extends React.Component {
 		lineHeight: 1.3
 	}
 
+	headerStyle = {
+		fontSize: "25px",
+		marginTop: "30px",
+		marginBottom: "30px",
+	}
+
 	constructor(props) {
 		super(props)
 		this.state = {
@@ -43,19 +49,21 @@ class App extends React.Component {
 	render() {
 		var updateSearchText = e => this.setState({searchText: e.target.value})
 		var submitSearch = e => {e.preventDefault(); this.search()}
-
 		return (
 		 <div style={{height: "100%", display: "flex", justifyContent: "center"}}>
 			 <div style={this.style}>
 				 {this.state.errorMessage && this.state.errorMessage}
-				 <h1>Book Engine</h1>
-				 <SearchBar
-					 onSubmit={submitSearch}
-					 onChange={updateSearchText}
-					 disabled={false}
-					 placeholder={this.state.searchText}
-					 value={this.state.searchText}
-					/>
+				 <div style={this.headerStyle}>Book Engine</div>
+				 <div style={{marginBottom: "20px"}}>
+					 <SearchBar
+						 onSubmit={submitSearch}
+						 onChange={updateSearchText}
+						 disabled={this.state.isWaitingForResults}
+						 placeholder={this.state.searchText}
+						 value={this.state.searchText}
+						 isLoading={this.state.isWaitingForResults}
+						/>
+				 </div>
 				{this.state.units.map(unit => <ResultItem key={unit.vectorNum} unit={unit} />)}
 			 </div>
 		 </div>
@@ -66,16 +74,23 @@ class App extends React.Component {
 
 class SearchBar extends React.Component{
 
-	inputStyle = {
+	style = {
+		borderRadius: "4px",
 		width: "100%",
 		boxShadow: "0px 1px 4px #ccc",
+		boxSizing: "border-box",
+		display: "flex",
+	}
+
+	inputStyle = {
+		borderRadius: "4px",
 		border: "none",
 		outline: "none",
-		// height: "30px",
-		borderRadius: "4px",
 		padding: "10px",
 		fontFamily: "inherit",
 		fontSize: "inherit",
+		width: "100%",
+		backgroundColor: "white",
 	}
 
   constructor(props){
@@ -84,17 +99,18 @@ class SearchBar extends React.Component{
 
   render() {
     return (
-      <div style={{width: "100%", boxSizing: "border-box"}}>
-        <form onSubmit={this.props.onSubmit}>
-	        <div uk-grid="true">
-	          <input style={this.inputStyle}
-							placeholder={this.props.placeholder}
-							onChange={this.props.onChange}
-							disabled={this.props.disabled}
-							value={this.props.value}
-						/>
-	        </div>
+      <div style={this.style}>
+        <form onSubmit={this.props.onSubmit} style={{margin: 0, width: "100%"}}>
+          <input style={this.inputStyle}
+						placeholder={this.props.placeholder}
+						onChange={this.props.onChange}
+						disabled={this.props.disabled}
+						value={this.props.value}
+					/>
         </form>
+				<div style={{display: "flex", justifyContent: "center", alignItems: "center", paddingRight: "5px"}}>
+					<LoadingIndicator isLoading={this.props.isLoading} onClicked={this.props.onSubmit} />
+				</div>
       </div>
     )
   }
@@ -104,9 +120,9 @@ class ResultItem extends React.Component {
 
 	style = {
 		// boxShadow: "0px 0px 3px #ccc",
-		padding: "10px",
-		paddingBottom: "20px",
+		padding: "20px",
 		paddingTop: "20px",
+		paddingBottom: "20px",
 		cursor: "pointer",
 	}
 
@@ -116,7 +132,7 @@ class ResultItem extends React.Component {
 	}
 
 	infoStringStyle = {
-		marginTop: "10px",
+		marginTop: "20px",
 		textAlign: "right",
 		fontSize: "16px",
 		width: "60%",
@@ -161,7 +177,7 @@ class ResultItem extends React.Component {
 	}
 
 	fetchMoreText() {
-		var numToAdd = 10
+		var numToAdd = 15
 		var bookNum = this.props.unit.bookNum
 		if (this.state.isLoading) {
 			return
@@ -233,4 +249,61 @@ class ResultItem extends React.Component {
 		)
 	}
 }
+
+class LoadingIndicator extends React.Component {
+
+	containerStyle = {
+		display: "flex",
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor:"white",
+		borderRadius:"50%",
+		height:"30px",
+		width:"30px",
+		cursor: "pointer",
+	}
+
+  constructor(props) {
+    super(props)
+    this.iconRef = React.createRef()
+  }
+
+  updateAnimation() {
+    if (this.props.isLoading) {
+      this.iconRef.current.style.animationPlayState = "running"
+    }
+    else {
+      this.iconRef.current.style.animationPlayState = "paused"
+    }
+  }
+
+  componentDidMount() {
+    this.iconRef.current.style.animation = "rotating 0.5s linear infinite"
+    this.updateAnimation()
+  }
+  componentDidUpdate() {
+    this.updateAnimation()
+  }
+
+  render() {
+    var active = true
+    return (
+      <div ref={this.iconRef} onClick={this.props.onClicked} style={this.containerStyle}>
+        <div author="Loading icon by aurer: https://codepen.io/aurer/pen/jEGbA" title="0">
+          <svg version="1.1" id="loader-1" x="0px" y="0px"
+           width="30px" height="30px" viewBox="0 0 40 40" enableBackground="new 0 0 40 40" space="preserve">
+            <path opacity="0.2" fill="#000" d="M20.201,5.169c-8.254,0-14.946,6.692-14.946,14.946c0,8.255,6.692,14.946,14.946,14.946
+              s14.946-6.691,14.946-14.946C35.146,11.861,28.455,5.169,20.201,5.169z M20.201,31.749c-6.425,0-11.634-5.208-11.634-11.634
+              c0-6.425,5.209-11.634,11.634-11.634c6.425,0,11.633,5.209,11.633,11.634C31.834,26.541,26.626,31.749,20.201,31.749z"/>
+            <path fill="#000" d="M26.013,10.047l1.654-2.866c-2.198-1.272-4.743-2.012-7.466-2.012h0v3.312h0
+              C22.32,8.481,24.301,9.057,26.013,10.047z">
+            </path>
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+}
+
 ReactDOM.render(<App />, document.getElementById('root'));
