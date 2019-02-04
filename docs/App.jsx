@@ -89,7 +89,7 @@ class App extends React.Component {
 				 </div>
 				{this.state.units.map(unit => <ResultItem key={unit.vectorNum} unit={unit} />)}
 				<div style={{marginTop: "30px", marginBottom: "30px", border: "1px solid #fff", borderRadius: "4px", padding: "5px"}}>
-					Search within 50,000 Project Gutenberg books! Keep loading more of a book by clicking or tapping the text.
+					Search within 50,000 Project Gutenberg books! A sentence will work better than keywords when searching — for example, "the bloody knife lay on the floor" works better than "bloody knife". Keep loading more of a book by clicking or tapping the text.
 					<br/><br/>Feedback? Please message me: <a href="https://twitter.com/hollowayaegis">my twitter</a>
 				</div>
 			 </div>
