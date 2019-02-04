@@ -10,10 +10,26 @@ var fetchFromServer = (url, body) => {
 	}).then(res => res.json())
 }
 
+var exampleQueries = [
+	"cooking a stew",
+	"cooking a stew for the family",
+	"trees were dancing in the wind",
+	"\"I never want to see you again\"",
+	"looking for inspiration for his next project",
+	"walking through the tall trees",
+	"they were harvesting apples for cider",
+	"the fire crackled as we sat around it telling stories",
+	"a fire engulfing the house",
+	"hi there",
+	"are we alone in the universe?"
+]
+
 class App extends React.Component {
 
 	style = {
 		width: "700px",
+		paddingLeft: "10px",
+		paddingRight: "10px",
 		maxWidth: "700px",
 		fontSize: "16px",
 		fontFamily: "Arial",
@@ -21,7 +37,7 @@ class App extends React.Component {
 	}
 
 	headerStyle = {
-		fontSize: "25px",
+		fontSize: "35px",
 		marginTop: "30px",
 		marginBottom: "30px",
 	}
@@ -33,11 +49,19 @@ class App extends React.Component {
 			isWaitingForResults: false,
 			searchText: "",
 			errorMessage: "",
+			examplePlaceholder: this.examplePlaceholder(),
 		}
+	}
+
+	examplePlaceholder() {
+		var randIdx = Math.floor(Math.random() * exampleQueries.length)
+		var examplePlaceholder = "e.g. " + exampleQueries[randIdx]
+		return examplePlaceholder
 	}
 
 	search() {
 		this.setState({isWaitingForResults: true})
+		this.setState({examplePlaceholder: this.examplePlaceholder()})
 		fetchFromServer(API_URL, {"sentence": this.state.searchText}).then(res => {
 			this.setState({units: res.textUnits, error: "", isWaitingForResults: false})
 		}).catch(err => {
@@ -45,7 +69,6 @@ class App extends React.Component {
 			this.setState({isWaitingForResults: false, errorMessage})
 		})
 	}
-
 	render() {
 		var updateSearchText = e => this.setState({searchText: e.target.value})
 		var submitSearch = e => {e.preventDefault(); this.search()}
@@ -59,12 +82,16 @@ class App extends React.Component {
 						 onSubmit={submitSearch}
 						 onChange={updateSearchText}
 						 disabled={this.state.isWaitingForResults}
-						 placeholder={this.state.searchText}
+						 placeholder={this.state.examplePlaceholder}
 						 value={this.state.searchText}
 						 isLoading={this.state.isWaitingForResults}
 						/>
 				 </div>
 				{this.state.units.map(unit => <ResultItem key={unit.vectorNum} unit={unit} />)}
+				<div style={{marginTop: "30px", marginBottom: "30px", border: "1px solid #fff", borderRadius: "4px", padding: "5px"}}>
+					Search within 50,000 Project Gutenberg books! Keep loading more of a book by clicking or tapping the text.
+					<br/><br/>Feedback? Please message me: <a href="https://twitter.com/hollowayaegis">my twitter</a>
+				</div>
 			 </div>
 		 </div>
 		)
@@ -123,10 +150,11 @@ class ResultItem extends React.Component {
 		padding: "20px",
 		paddingTop: "20px",
 		paddingBottom: "20px",
-		cursor: "pointer",
+		borderRadius: "4px",
 	}
 
 	textAreaStyle = {
+		cursor: "pointer",
 		padding: "5px",
 		paddingRight: "15px", //scroll bar space
 	}
@@ -227,11 +255,8 @@ class ResultItem extends React.Component {
 
 		return (
 			<React.Fragment>
-				<div style={{...this.style, ...hoverStyle}}
-					onMouseOver={onHover}
-					onMouseLeave={onUnHover}
-					onClick={onClick}>
-					<div ref={this.textAreaRef} style={{...this.textAreaStyle, ...expandedStyle}}>
+				<div style={{...this.style, ...hoverStyle}} onMouseOver={onHover} onMouseLeave={onUnHover}>
+					<div onClick={onClick} ref={this.textAreaRef} style={{...this.textAreaStyle, ...expandedStyle}}>
 						<div>{this.formatText(this.state.units[0]["textUnit"])}</div>
 						{this.state.units.slice(1).map(tu => (
 							<React.Fragment key={tu["inBookLocation"]}>
